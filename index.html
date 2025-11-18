@@ -111,31 +111,26 @@
       .names {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px 16px;
+        gap: 10px 14px;
       }
 
       .name {
-        position: relative;
-        padding-left: 16px;
-      }
-
-      .name::before {
-        content: "";
-        position: absolute;
-        left: 0;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: #f8d66d;
-        box-shadow: 0 0 8px rgba(248, 214, 109, 0.7);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 16px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+        font-weight: 600;
+        letter-spacing: 0.01em;
       }
 
       .times {
-        opacity: 0.8;
-        font-size: 0.95rem;
-        margin-left: 6px;
+        opacity: 0.85;
+        font-size: 0.9rem;
+        color: #f8d66d;
       }
 
       .columns span,
@@ -203,6 +198,7 @@
             Chris
             <span class="times">&times; 2</span>
           </span>
+          <span class="name">Hunter</span>
         </div>
       </div>
       <div class="row">
@@ -222,8 +218,12 @@
     <script>
       (() => {
         const FADE_DURATION = 1000;
-        const MAX_VARIANTS = 20;
-        const PROBE_TIMEOUT = 1500;
+        const BACKGROUNDS = [
+          "https://felewin.github.io/Scrolls-Leaderboard/background%20(1).mp4",
+          "https://felewin.github.io/Scrolls-Leaderboard/background%20(2).mp4",
+          "https://felewin.github.io/Scrolls-Leaderboard/background%20(3).mp4",
+        ];
+        const AUTO_CYCLE_INTERVAL = 60000;
 
         const primaryVideo = document.getElementById("bg-video-primary");
         const secondaryVideo = document.getElementById("bg-video-secondary");
@@ -233,6 +233,8 @@
         let backgrounds = [];
         let currentIndex = 0;
         let isSwitching = false;
+        let autoCycleEnabled = true;
+        let autoCycleTimer = null;
 
         const ensurePlayback = (video) =>
           new Promise((resolve) => {
@@ -268,57 +270,6 @@
             video.src = src;
             video.load();
           });
-
-        const probeVideoSource = (path) =>
-          new Promise((resolve) => {
-            const probe = document.createElement("video");
-            probe.preload = "metadata";
-            probe.muted = true;
-            let settled = false;
-
-            const cleanup = (result) => {
-              if (settled) return;
-              settled = true;
-              probe.removeEventListener("loadeddata", handleLoaded);
-              probe.removeEventListener("error", handleError);
-              probe.removeAttribute("src");
-              probe.load();
-              resolve(result);
-            };
-
-            const handleLoaded = () => cleanup(true);
-            const handleError = () => cleanup(false);
-
-            probe.addEventListener("loadeddata", handleLoaded);
-            probe.addEventListener("error", handleError);
-            probe.src = path;
-            probe.load();
-
-            setTimeout(() => cleanup(false), PROBE_TIMEOUT);
-          });
-
-        const detectBackgrounds = async () => {
-          const discovered = [];
-          if (await probeVideoSource("background.mp4")) {
-            discovered.push("background.mp4");
-          }
-
-          for (let i = 1; i <= MAX_VARIANTS; i += 1) {
-            const candidate = `background (${i}).mp4`;
-            const exists = await probeVideoSource(candidate);
-            if (!exists) break;
-            discovered.push(candidate);
-          }
-
-          if (!discovered.length) {
-            console.warn(
-              "No background video files detected. Add files named background.mp4 or background (n).mp4."
-            );
-            discovered.push("background.mp4");
-          }
-
-          return discovered;
-        };
 
         const switchBackground = async () => {
           if (isSwitching || backgrounds.length <= 1) {
@@ -358,8 +309,37 @@
           }
         };
 
-        const handleSpace = (event) => {
-          if (event.code !== "Space") {
+        const autoCycleTick = async () => {
+          if (!autoCycleEnabled) {
+            return;
+          }
+          await switchBackground();
+          if (autoCycleEnabled) {
+            queueNextAutoCycle();
+          }
+        };
+
+        const queueNextAutoCycle = () => {
+          clearTimeout(autoCycleTimer);
+          if (!autoCycleEnabled) {
+            autoCycleTimer = null;
+            return;
+          }
+          autoCycleTimer = setTimeout(autoCycleTick, AUTO_CYCLE_INTERVAL);
+        };
+
+        const toggleAutoCycle = () => {
+          autoCycleEnabled = !autoCycleEnabled;
+          if (autoCycleEnabled) {
+            queueNextAutoCycle();
+          } else {
+            clearTimeout(autoCycleTimer);
+            autoCycleTimer = null;
+          }
+        };
+
+        const handleKeydown = (event) => {
+          if (event.code !== "Space" && event.code !== "Enter") {
             return;
           }
           const tagName = event.target.tagName;
@@ -367,19 +347,40 @@
             return;
           }
           event.preventDefault();
-          switchBackground();
+          if (event.code === "Space") {
+            if (autoCycleEnabled) {
+              clearTimeout(autoCycleTimer);
+            }
+            switchBackground().then(() => {
+              if (autoCycleEnabled) {
+                queueNextAutoCycle();
+              }
+            });
+          } else if (event.code === "Enter") {
+            toggleAutoCycle();
+          }
         };
 
-        document.addEventListener("keydown", handleSpace);
+        document.addEventListener("keydown", handleKeydown);
 
         const init = async () => {
-          backgrounds = await detectBackgrounds();
+          backgrounds = BACKGROUNDS.slice();
+          if (!backgrounds.length) {
+            autoCycleEnabled = false;
+            return;
+          }
+          if (backgrounds.length <= 1) {
+            autoCycleEnabled = false;
+          }
           try {
             await prepareVideo(activeVideo, backgrounds[0]);
             activeVideo.classList.add("is-active");
             await ensurePlayback(activeVideo);
           } catch (error) {
             console.warn(error.message);
+          }
+          if (autoCycleEnabled) {
+            queueNextAutoCycle();
           }
         };
 
