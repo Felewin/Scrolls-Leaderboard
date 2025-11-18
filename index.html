@@ -80,7 +80,7 @@
         grid-template-columns: 160px 1fr;
         gap: 16px;
         padding: 0 0 12px;
-        font-size: 0.95rem;
+        font-size: 1.1875rem;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: rgba(246, 245, 251, 0.75);
@@ -95,7 +95,7 @@
         gap: 16px;
         padding: 16px 0;
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        font-size: 1.05rem;
+        font-size: 1.3125rem;
         justify-content: center;
       }
 
@@ -127,6 +127,26 @@
         letter-spacing: 0.01em;
       }
 
+      .name--new {
+        background: rgba(78, 160, 108, 0.35);
+        border-color: rgba(119, 255, 188, 0.9);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), 0 0 16px rgba(119, 255, 188, 0.35);
+      }
+
+      .badge-editor {
+        display: inline-flex;
+        align-items: center;
+        min-width: 10px;
+        padding: 6px 2px;
+        margin-left: 2px;
+        outline: none;
+        border: none;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        caret-color: #f6f5fb;
+      }
+
       .times {
         opacity: 0.85;
         font-size: 0.9rem;
@@ -136,6 +156,17 @@
       .columns span,
       .row > * {
         text-align: left;
+      }
+
+      .columns span:first-child {
+        white-space: nowrap;
+        justify-self: stretch;
+        text-align: left;
+      }
+
+      .columns span:last-child {
+        justify-self: stretch;
+        text-align: right;
       }
 
       @media (max-width: 540px) {
@@ -152,8 +183,12 @@
           gap: 4px;
         }
 
+        .columns span:last-child {
+          text-align: left;
+        }
+
         .turns {
-          font-size: 1rem;
+          font-size: 1.25rem;
         }
       }
     </style>
@@ -182,7 +217,7 @@
     <main class="leaderboard">
       <h1>Scrolls Leaderboard</h1>
       <div class="columns">
-        <span># of Turns To Win</span>
+        <span>Turns To Win</span>
         <span>Wizards</span>
       </div>
       <div class="row">
@@ -385,6 +420,184 @@
         };
 
         init();
+      })();
+    </script>
+    <script>
+      (() => {
+        const nameContainers = Array.from(document.querySelectorAll(".names"));
+        if (!nameContainers.length) {
+          return;
+        }
+
+        const normalizeWhitespace = (value = "") => value.replace(/\s+/g, " ").trim();
+        const toKey = (value) => normalizeWhitespace(value).toLowerCase();
+
+        const extractBadgeName = (badge) => {
+          const clone = badge.cloneNode(true);
+          const times = clone.querySelector(".times");
+          if (times) {
+            times.remove();
+          }
+          return normalizeWhitespace(clone.textContent || "");
+        };
+
+        const parseCount = (badge) => {
+          const times = badge.querySelector(".times");
+          if (!times) {
+            return 1;
+          }
+          const match = times.textContent.match(/\d+/);
+          return match ? parseInt(match[0], 10) : 1;
+        };
+
+        const initializeBadges = () => {
+          document.querySelectorAll(".name").forEach((badge) => {
+            const label = extractBadgeName(badge);
+            badge.dataset.label = toKey(label);
+            badge.dataset.count = String(parseCount(badge));
+          });
+        };
+
+        const findBadge = (container, key) =>
+          Array.from(container.querySelectorAll(".name")).find(
+            (badge) => (badge.dataset.label || toKey(extractBadgeName(badge))) === key,
+          );
+
+        const markBadgeUpdated = (badge) => {
+          badge.classList.add("name--new");
+        };
+
+        const ensureTimes = (badge, count) => {
+          let times = badge.querySelector(".times");
+          if (!times) {
+            times = document.createElement("span");
+            times.className = "times";
+            badge.appendChild(times);
+          }
+          times.textContent = `× ${count}`;
+        };
+
+        const incrementBadge = (badge) => {
+          const current = parseInt(badge.dataset.count || "1", 10) || 1;
+          const next = current + 1;
+          badge.dataset.count = String(next);
+          ensureTimes(badge, next);
+          markBadgeUpdated(badge);
+        };
+
+        const createBadge = (name, key) => {
+          const badge = document.createElement("span");
+          badge.className = "name name--new";
+          badge.textContent = name;
+          badge.dataset.label = key;
+          badge.dataset.count = "1";
+          return badge;
+        };
+
+        let activeEditor = null;
+        let activeContainer = null;
+
+        const placeCaretAtEnd = (element) => {
+          const selection = window.getSelection();
+          if (!selection) {
+            return;
+          }
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          range.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        };
+
+        const teardownEditor = () => {
+          if (!activeEditor) {
+            return;
+          }
+          activeEditor.removeEventListener("keydown", handleEditorKeydown);
+          activeEditor.removeEventListener("blur", handleEditorBlur);
+          activeEditor.remove();
+          activeEditor = null;
+          activeContainer = null;
+        };
+
+        const handleSubmission = () => {
+          if (!activeEditor || !activeContainer) {
+            return;
+          }
+          const inputValue = normalizeWhitespace(activeEditor.textContent);
+          if (!inputValue) {
+            teardownEditor();
+            return;
+          }
+
+          const key = toKey(inputValue);
+          const existing = findBadge(activeContainer, key);
+          if (existing) {
+            incrementBadge(existing);
+          } else {
+            const badge = createBadge(inputValue, key);
+            activeContainer.insertBefore(badge, activeEditor);
+          }
+
+          teardownEditor();
+        };
+
+        const handleEditorKeydown = (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            handleSubmission();
+          } else if (event.key === "Escape") {
+            event.preventDefault();
+            teardownEditor();
+          }
+        };
+
+        const handleEditorBlur = () => {
+          teardownEditor();
+        };
+
+        const activateEditor = (container) => {
+          if (activeContainer === container && activeEditor) {
+            activeEditor.focus();
+            placeCaretAtEnd(activeEditor);
+            return;
+          }
+
+          teardownEditor();
+
+          const editor = document.createElement("span");
+          editor.className = "badge-editor";
+          editor.contentEditable = "true";
+          editor.spellcheck = false;
+          container.appendChild(editor);
+
+          editor.addEventListener("keydown", handleEditorKeydown);
+          editor.addEventListener("blur", handleEditorBlur);
+
+          activeEditor = editor;
+          activeContainer = container;
+
+          requestAnimationFrame(() => {
+            editor.focus();
+            placeCaretAtEnd(editor);
+          });
+        };
+
+        nameContainers.forEach((container) => {
+          container.addEventListener("click", () => activateEditor(container));
+        });
+
+        document.addEventListener("pointerdown", (event) => {
+          if (!activeEditor) {
+            return;
+          }
+          if (event.target.closest(".names")) {
+            return;
+          }
+          teardownEditor();
+        });
+
+        initializeBadges();
       })();
     </script>
   </body>
