@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Scrolls Leaderboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #060313;
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #f6f5fb;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .bg-video-stage {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      .bg-video {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0;
+        transition: opacity 1s ease;
+        filter: saturate(1.15) brightness(0.9);
+      }
+
+      .bg-video.is-active {
+        opacity: 0.85;
+      }
+
+      .leaderboard {
+        width: min(600px, 90vw);
+        background: rgba(6, 6, 18, 0.75);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 32px;
+        padding: 40px;
+        box-shadow: 0 20px 40px rgba(4, 2, 12, 0.7);
+        backdrop-filter: blur(12px);
+      }
+
+      h1 {
+        font-family: "Cinzel", serif;
+        text-align: center;
+        letter-spacing: 0.12em;
+        font-size: clamp(1.8rem, 2.8vw, 2.8rem);
+        margin: 0 0 24px;
+        text-transform: uppercase;
+      }
+
+      .columns {
+        display: grid;
+        grid-template-columns: 160px 1fr;
+        gap: 16px;
+        padding: 0 0 12px;
+        font-size: 0.95rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(246, 245, 251, 0.75);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        margin-bottom: 16px;
+        justify-content: center;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 160px 1fr;
+        gap: 16px;
+        padding: 16px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 1.05rem;
+        justify-content: center;
+      }
+
+      .row:last-child {
+        border-bottom: none;
+      }
+
+      .turns {
+        font-weight: 600;
+        color: #cfb9ff;
+      }
+
+      .names {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 16px;
+      }
+
+      .name {
+        position: relative;
+        padding-left: 16px;
+      }
+
+      .name::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #f8d66d;
+        box-shadow: 0 0 8px rgba(248, 214, 109, 0.7);
+      }
+
+      .times {
+        opacity: 0.8;
+        font-size: 0.95rem;
+        margin-left: 6px;
+      }
+
+      .columns span,
+      .row > * {
+        text-align: left;
+      }
+
+      @media (max-width: 540px) {
+        .leaderboard {
+          padding: 28px 24px;
+        }
+
+        .columns,
+        .row {
+          grid-template-columns: 1fr;
+        }
+
+        .columns {
+          gap: 4px;
+        }
+
+        .turns {
+          font-size: 1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-video-stage" aria-hidden="true">
+      <video
+        id="bg-video-primary"
+        class="bg-video"
+        autoplay
+        loop
+        muted
+        playsinline
+        preload="auto"
+      ></video>
+      <video
+        id="bg-video-secondary"
+        class="bg-video"
+        autoplay
+        loop
+        muted
+        playsinline
+        preload="auto"
+      ></video>
+    </div>
+    <main class="leaderboard">
+      <h1>Scrolls Leaderboard</h1>
+      <div class="columns">
+        <span># of Turns To Win</span>
+        <span>Wizards</span>
+      </div>
+      <div class="row">
+        <div class="turns">1 Turn</div>
+        <div class="names">
+          <span class="name">Autumn</span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="turns">2 Turns</div>
+        <div class="names">
+          <span class="name">
+            Chris
+            <span class="times">&times; 2</span>
+          </span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="turns">3 Turns</div>
+        <div class="names">
+          <span class="name">Chris</span>
+          <span class="name">Victoria</span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="turns">4 Turns</div>
+        <div class="names">
+          <span class="name">Jamie</span>
+        </div>
+      </div>
+    </main>
+    <script>
+      (() => {
+        const FADE_DURATION = 1000;
+        const MAX_VARIANTS = 20;
+        const PROBE_TIMEOUT = 1500;
+
+        const primaryVideo = document.getElementById("bg-video-primary");
+        const secondaryVideo = document.getElementById("bg-video-secondary");
+
+        let activeVideo = primaryVideo;
+        let inactiveVideo = secondaryVideo;
+        let backgrounds = [];
+        let currentIndex = 0;
+        let isSwitching = false;
+
+        const ensurePlayback = (video) =>
+          new Promise((resolve) => {
+            const attempt = () => {
+              const playPromise = video.play();
+              if (playPromise && typeof playPromise.then === "function") {
+                playPromise.then(resolve).catch(() => {
+                  setTimeout(attempt, 400);
+                });
+              } else {
+                resolve();
+              }
+            };
+            attempt();
+          });
+
+        const prepareVideo = (video, src) =>
+          new Promise((resolve, reject) => {
+            const onLoaded = () => {
+              cleanup();
+              resolve();
+            };
+            const onError = () => {
+              cleanup();
+              reject(new Error(`Unable to load ${src}`));
+            };
+            const cleanup = () => {
+              video.removeEventListener("loadeddata", onLoaded);
+              video.removeEventListener("error", onError);
+            };
+            video.addEventListener("loadeddata", onLoaded);
+            video.addEventListener("error", onError);
+            video.src = src;
+            video.load();
+          });
+
+        const probeVideoSource = (path) =>
+          new Promise((resolve) => {
+            const probe = document.createElement("video");
+            probe.preload = "metadata";
+            probe.muted = true;
+            let settled = false;
+
+            const cleanup = (result) => {
+              if (settled) return;
+              settled = true;
+              probe.removeEventListener("loadeddata", handleLoaded);
+              probe.removeEventListener("error", handleError);
+              probe.removeAttribute("src");
+              probe.load();
+              resolve(result);
+            };
+
+            const handleLoaded = () => cleanup(true);
+            const handleError = () => cleanup(false);
+
+            probe.addEventListener("loadeddata", handleLoaded);
+            probe.addEventListener("error", handleError);
+            probe.src = path;
+            probe.load();
+
+            setTimeout(() => cleanup(false), PROBE_TIMEOUT);
+          });
+
+        const detectBackgrounds = async () => {
+          const discovered = [];
+          if (await probeVideoSource("background.mp4")) {
+            discovered.push("background.mp4");
+          }
+
+          for (let i = 1; i <= MAX_VARIANTS; i += 1) {
+            const candidate = `background (${i}).mp4`;
+            const exists = await probeVideoSource(candidate);
+            if (!exists) break;
+            discovered.push(candidate);
+          }
+
+          if (!discovered.length) {
+            console.warn(
+              "No background video files detected. Add files named background.mp4 or background (n).mp4."
+            );
+            discovered.push("background.mp4");
+          }
+
+          return discovered;
+        };
+
+        const switchBackground = async () => {
+          if (isSwitching || backgrounds.length <= 1) {
+            return;
+          }
+
+          isSwitching = true;
+          const nextIndex = (currentIndex + 1) % backgrounds.length;
+          const nextSource = backgrounds[nextIndex];
+
+          inactiveVideo.classList.remove("is-active");
+
+          try {
+            await prepareVideo(inactiveVideo, nextSource);
+            inactiveVideo.currentTime = 0;
+            await ensurePlayback(inactiveVideo);
+
+            requestAnimationFrame(() => {
+              inactiveVideo.classList.add("is-active");
+              activeVideo.classList.remove("is-active");
+            });
+
+            setTimeout(() => {
+              const previousActive = activeVideo;
+              activeVideo = inactiveVideo;
+              inactiveVideo = previousActive;
+              inactiveVideo.classList.remove("is-active");
+              inactiveVideo.pause();
+              inactiveVideo.removeAttribute("src");
+              inactiveVideo.load();
+              currentIndex = nextIndex;
+              isSwitching = false;
+            }, FADE_DURATION);
+          } catch (error) {
+            console.warn(error.message);
+            isSwitching = false;
+          }
+        };
+
+        const handleSpace = (event) => {
+          if (event.code !== "Space") {
+            return;
+          }
+          const tagName = event.target.tagName;
+          if (tagName === "INPUT" || tagName === "TEXTAREA" || event.target.isContentEditable) {
+            return;
+          }
+          event.preventDefault();
+          switchBackground();
+        };
+
+        document.addEventListener("keydown", handleSpace);
+
+        const init = async () => {
+          backgrounds = await detectBackgrounds();
+          try {
+            await prepareVideo(activeVideo, backgrounds[0]);
+            activeVideo.classList.add("is-active");
+            await ensurePlayback(activeVideo);
+          } catch (error) {
+            console.warn(error.message);
+          }
+        };
+
+        init();
+      })();
+    </script>
+  </body>
+</html>
